@@ -53,6 +53,9 @@
     <select id="units"><option value="ft" selected>ft</option><option value="in">in</option><option value="m">m</option></select>
     <label>Snap <select id="snap" title="How far lines jump when snapping to the grid"><option value="1" selected>1 square</option><option value="0.5">1/2 square</option><option value="0.25">1/4 square</option></select></label>
     <button id="dims" class="on" title="Show lengths on walls and rooms">Measurements</button>
+    <select id="nsize" title="Size of the measurement numbers">
+      <option value="12">Small numbers</option><option value="16" selected>Medium numbers</option><option value="20">Large numbers</option><option value="26">Huge numbers</option>
+    </select>
   </div>
   <div class="group">
     <button id="undo" title="Undo (Ctrl+Z)">Undo</button>
@@ -95,13 +98,14 @@ function load() {
   } catch (e) {}
 }
 function doc() {
-  return { shapes, unit: +$('unit').value, units: $('units').value, snap: +$('snap').value, view };
+  return { shapes, unit: +$('unit').value, units: $('units').value, snap: +$('snap').value, numSize: numSize(), view };
 }
 function applyDoc(d) {
   shapes = d.shapes || [];
   if (d.unit) $('unit').value = d.unit;
   if (d.units) $('units').value = d.units;
   if (d.snap) $('snap').value = d.snap;
+  if (d.numSize) $('nsize').value = d.numSize;
   if (d.view) view = d.view;
   snapLabels();
 }
@@ -255,6 +259,9 @@ function tiny(squares) {
   const inches = u === 'ft' ? v * 12 : u === 'm' ? v * 39.37 : v;
   return inches <= 4.01;
 }
+// Measurement numbers are a fixed screen size, set from the numbers menu, so
+// they stay readable at any zoom.
+function numSize() { return +$('nsize').value || 16; }
 // Measurements are bold and take the color of the line they measure, so it
 // is clear which number belongs to which line.
 function label(text, x, y, angle = 0, color = '#2f6fd6') {
@@ -262,10 +269,11 @@ function label(text, x, y, angle = 0, color = '#2f6fd6') {
   ctx.translate(x, y);
   if (angle > Math.PI / 2 || angle < -Math.PI / 2) angle += Math.PI;
   ctx.rotate(angle);
-  ctx.font = 'bold 12px system-ui, sans-serif';
+  const px = numSize();
+  ctx.font = `bold ${px}px system-ui, sans-serif`;
   const w = ctx.measureText(text).width + 8;
   ctx.fillStyle = 'rgba(251,252,254,0.9)';
-  ctx.fillRect(-w / 2, -17, w, 15);
+  ctx.fillRect(-w / 2, -(px + 5), w, px + 3);
   ctx.fillStyle = color;
   ctx.textAlign = 'center';
   ctx.fillText(text, 0, -6);
@@ -329,7 +337,7 @@ function drawShape(s, v, isSel) {
       if (Math.abs(s.w) * v.s > 70 && Math.abs(s.h) * v.s > 30) {
         const inches = $('units').value === 'in';
         const area = Math.abs(s.w * s.h) * Math.pow(+$('unit').value || 1, 2) / (inches ? 144 : 1);
-        ctx.save(); ctx.font = 'bold 12px system-ui, sans-serif'; ctx.fillStyle = '#5d6b7a'; ctx.textAlign = 'center';
+        ctx.save(); ctx.font = `bold ${numSize()}px system-ui, sans-serif`; ctx.fillStyle = '#5d6b7a'; ctx.textAlign = 'center';
         ctx.fillText(`${+area.toFixed(1)} sq ${inches ? 'ft' : $('units').value}`, x + Math.abs(s.w) * v.s / 2, y + Math.abs(s.h) * v.s / 2 + 4);
         ctx.restore();
       }
@@ -579,6 +587,7 @@ $('clear').onclick = () => { if (shapes.length && confirm('Clear the whole drawi
 $('dims').onclick = () => { showDims = !showDims; $('dims').classList.toggle('on', showDims); render(); };
 $('unit').oninput = $('units').onchange = () => { snapLabels(); persist(); render(); };
 $('snap').onchange = persist;
+$('nsize').onchange = () => { persist(); render(); };
 
 function download(name, href) {
   const a = document.createElement('a'); a.href = href; a.download = name; a.click();
