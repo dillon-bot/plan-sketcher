@@ -51,6 +51,7 @@
   <div class="group">
     <label>1 square = <input type="number" id="unit" value="1" min="0.01" step="0.25"></label>
     <select id="units"><option value="ft" selected>ft</option><option value="in">in</option><option value="m">m</option></select>
+    <label>Snap <select id="snap" title="How far lines jump when snapping to the grid"><option value="1" selected>1 square</option><option value="0.5">1/2 square</option><option value="0.25">1/4 square</option></select></label>
     <button id="dims" class="on" title="Show lengths on walls and rooms">Measurements</button>
   </div>
   <div class="group">
@@ -94,13 +95,15 @@ function load() {
   } catch (e) {}
 }
 function doc() {
-  return { shapes, unit: +$('unit').value, units: $('units').value, view };
+  return { shapes, unit: +$('unit').value, units: $('units').value, snap: +$('snap').value, view };
 }
 function applyDoc(d) {
   shapes = d.shapes || [];
   if (d.unit) $('unit').value = d.unit;
   if (d.units) $('units').value = d.units;
+  if (d.snap) $('snap').value = d.snap;
   if (d.view) view = d.view;
+  snapLabels();
 }
 function persist() {
   try { localStorage.setItem(STORE, JSON.stringify(doc())); } catch (e) {}
@@ -116,7 +119,7 @@ const toWorld = (px, py) => ({ x: (px - view.x) / view.s, y: (py - view.y) / vie
 const toScreen = (wx, wy) => ({ x: wx * view.s + view.x, y: wy * view.s + view.y });
 function snap(p, free) {
   if (free) return p;
-  const step = view.s >= 40 ? 0.5 : 1;   // half-squares once zoomed in enough to see them
+  const step = +$('snap').value || 1;
   return { x: Math.round(p.x / step) * step, y: Math.round(p.y / step) * step };
 }
 function distSeg(p, a, b) {
@@ -230,6 +233,11 @@ function move(s, dx, dy) {
 }
 
 // ---------- measurement labels ----------
+// The snap menu names each step in real units too (at 4" a square: 4", 2", 1").
+function snapLabels() {
+  const names = { '1': '1 square', '0.5': '1/2 square', '0.25': '1/4 square' };
+  for (const o of $('snap').options) o.textContent = `${names[o.value]} (${fmt(+o.value)})`;
+}
 function fmt(squares) {
   const u = $('units').value;
   const v = Math.abs(squares) * (+$('unit').value || 1) / (u === 'in' ? 12 : 1);
@@ -569,7 +577,8 @@ $('undo').onclick = undo;
 $('redo').onclick = redo;
 $('clear').onclick = () => { if (shapes.length && confirm('Clear the whole drawing? (Undo can bring it back.)')) { commit(); shapes = []; selected = null; persist(); render(); } };
 $('dims').onclick = () => { showDims = !showDims; $('dims').classList.toggle('on', showDims); render(); };
-$('unit').oninput = $('units').onchange = () => { persist(); render(); };
+$('unit').oninput = $('units').onchange = () => { snapLabels(); persist(); render(); };
+$('snap').onchange = persist;
 
 function download(name, href) {
   const a = document.createElement('a'); a.href = href; a.download = name; a.click();
@@ -629,6 +638,7 @@ addEventListener('keyup', e => { if (e.key === ' ') { spaceDown = false; setTool
 addEventListener('resize', resize);
 
 load();
+snapLabels();
 setTool('line');
 resize();
 </script>
